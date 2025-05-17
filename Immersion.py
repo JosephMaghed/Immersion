@@ -32,6 +32,8 @@ while True:
     rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
     results = face_mesh.process(rgb_frame)
 
+    skin_color_text = "Skin RGB: N/A"
+
     if results.multi_face_landmarks:
         for face_landmarks in results.multi_face_landmarks:
             landmarks = face_landmarks.landmark
@@ -110,7 +112,30 @@ while True:
             cv2.putText(frame, "Chin", (x_chin - 20, y_chin + 20),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 128), 1)
 
-    cv2.imshow("Face Mesh Key Points", frame)
+            # ----- Skin color detection (average RGB on left cheek patch) -----
+            patch_size = 20
+            x_start = max(x_lc - patch_size // 2, 0)
+            y_start = max(y_lc - patch_size // 2, 0)
+            x_end = min(x_start + patch_size, w)
+            y_end = min(y_start + patch_size, h)
+
+            patch = frame[y_start:y_end, x_start:x_end]
+
+            if patch.size != 0:
+                b_mean = int(np.mean(patch[:, :, 0]))
+                g_mean = int(np.mean(patch[:, :, 1]))
+                r_mean = int(np.mean(patch[:, :, 2]))
+
+                skin_color_text = f"Skin RGB: R={r_mean} G={g_mean} B={b_mean}"
+
+            # Draw a small rectangle showing the sampled patch
+            cv2.rectangle(frame, (x_start, y_start), (x_end, y_end), (0, 255, 255), 1)
+
+    # Display skin color text at the bottom left
+    cv2.putText(frame, skin_color_text, (10, h - 20),
+                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
+
+    cv2.imshow("Face Mesh Key Points + Skin RGB", frame)
     if cv2.waitKey(1) & 0xFF == ord('q'):
         break
 
