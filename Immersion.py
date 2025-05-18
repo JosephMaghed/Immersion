@@ -145,11 +145,7 @@ while True:
                 else:
                     label_pos = (x - 30, y - 10)
 
-                # Optional: draw a line from point to label
-                cv2.line(frame, (x, y), label_pos, color, 1)
-
-                cv2.putText(frame, label, label_pos,
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+              
             # ----- LIP THICKNESS MEASUREMENT -----
             top_lip = landmarks[MOUTH_TOP_IDX]
             bottom_lip = landmarks[MOUTH_BOTTOM_IDX]
