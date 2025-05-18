@@ -9,6 +9,8 @@ face_mesh = mp_face_mesh.FaceMesh(max_num_faces=1, refine_landmarks=True)
 # Landmark indices
 LEFT_EYE_IDX = [33, 133]
 RIGHT_EYE_IDX = [362, 263]
+LEFT_EYE_CORNER_IDX = [130, 133]  # Inner and outer corners
+RIGHT_EYE_CORNER_IDX = [362, 359]
 LEFT_EYELID_IDX = [159, 145]
 RIGHT_EYELID_IDX = [386, 374]
 NOSE_TIP_IDX = 1
@@ -19,6 +21,10 @@ CHIN_IDX = 152
 LEFT_NOSTRIL_IDX = 98
 RIGHT_NOSTRIL_IDX = 327
 NOSE_TOP_IDX = 6
+MOUTH_TOP_IDX = 13
+MOUTH_BOTTOM_IDX = 14
+MOUTH_LEFT_IDX = 61
+MOUTH_RIGHT_IDX = 291
 
 # Initialize camera
 cap = cv2.VideoCapture(0)
@@ -67,13 +73,18 @@ while True:
             cv2.putText(frame, "Top Nose", (x_nt - 30, y_nt - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.4, (200, 255, 200), 1)
 
-            # ----- EYE ELLIPSES -----
+            # ----- EYE ELLIPSES & CORNER POINTS -----
             for eye_idx in [LEFT_EYE_IDX, RIGHT_EYE_IDX]:
                 x1_eye, y1_eye = int(landmarks[eye_idx[0]].x * w), int(landmarks[eye_idx[0]].y * h)
                 x2_eye, y2_eye = int(landmarks[eye_idx[1]].x * w), int(landmarks[eye_idx[1]].y * h)
                 center = ((x1_eye + x2_eye) // 2, (y1_eye + y2_eye) // 2)
                 axis_length = (abs(x2_eye - x1_eye) // 2, abs(y2_eye - y1_eye) // 2 + 5)
                 cv2.ellipse(frame, center, axis_length, 0, 0, 360, (0, 0, 255), 2)
+
+            for eye_corners in [LEFT_EYE_CORNER_IDX, RIGHT_EYE_CORNER_IDX]:
+                for idx in eye_corners:
+                    x, y = int(landmarks[idx].x * w), int(landmarks[idx].y * h)
+                    cv2.circle(frame, (x, y), 3, (150, 0, 255), -1)
 
             # ----- EYELID POINTS -----
             for eyelid_idx in [LEFT_EYELID_IDX, RIGHT_EYELID_IDX]:
@@ -91,16 +102,14 @@ while True:
             cv2.putText(frame, "Forehead Top", (x_fh - 40, y_fh - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 255), 1)
 
-            # ----- LEFT CHEEK -----
+            # ----- LEFT & RIGHT CHEEK -----
             left_cheek = landmarks[LEFT_CHEEK_IDX]
+            right_cheek = landmarks[RIGHT_CHEEK_IDX]
             x_lc, y_lc = int(left_cheek.x * w), int(left_cheek.y * h)
+            x_rc, y_rc = int(right_cheek.x * w), int(right_cheek.y * h)
             cv2.circle(frame, (x_lc, y_lc), 5, (0, 128, 255), -1)
             cv2.putText(frame, "Left Cheek", (x_lc - 40, y_lc - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 128, 255), 1)
-
-            # ----- RIGHT CHEEK -----
-            right_cheek = landmarks[RIGHT_CHEEK_IDX]
-            x_rc, y_rc = int(right_cheek.x * w), int(right_cheek.y * h)
             cv2.circle(frame, (x_rc, y_rc), 5, (0, 128, 255), -1)
             cv2.putText(frame, "Right Cheek", (x_rc - 40, y_rc - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 128, 255), 1)
@@ -111,6 +120,45 @@ while True:
             cv2.circle(frame, (x_chin, y_chin), 5, (0, 255, 128), -1)
             cv2.putText(frame, "Chin", (x_chin - 20, y_chin + 20),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 128), 1)
+
+            # ----- MOUTH POINTS -----
+            # ----- MOUTH POINTS with dynamic label positioning based on lip thickness -----
+            # ----- MOUTH POINTS with corrected label position (above/below lips) -----
+            # ----- MOUTH POINTS with fixed vertical offset for labels -----
+            # ----- MOUTH POINTS with visible offset and debug lines -----
+            for idx, label, color in zip(
+                    [MOUTH_TOP_IDX, MOUTH_BOTTOM_IDX, MOUTH_LEFT_IDX, MOUTH_RIGHT_IDX],
+                    ["Mouth Top", "Mouth Bottom", "Mouth Left", "Mouth Right"],
+                    [(255, 200, 0), (200, 150, 50), (100, 255, 100), (100, 255, 100)]):
+
+                x, y = int(landmarks[idx].x * w), int(landmarks[idx].y * h)
+                cv2.circle(frame, (x, y), 4, color, -1)
+                # Offset label position far from mouth center
+                if label == "Mouth Top":
+                    label_pos = (x - 30, y - 40)
+                elif label == "Mouth Bottom":
+                    label_pos = (x - 30, y + 40)
+                elif label == "Mouth Left":
+                    label_pos = (x - 60, y)
+                elif label == "Mouth Right":
+                    label_pos = (x + 10, y)
+                else:
+                    label_pos = (x - 30, y - 10)
+
+                # Optional: draw a line from point to label
+                cv2.line(frame, (x, y), label_pos, color, 1)
+
+                cv2.putText(frame, label, label_pos,
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
+            # ----- LIP THICKNESS MEASUREMENT -----
+            top_lip = landmarks[MOUTH_TOP_IDX]
+            bottom_lip = landmarks[MOUTH_BOTTOM_IDX]
+
+            # Convert normalized coordinates to pixel values
+            x_top, y_top = int(top_lip.x * w), int(top_lip.y * h)
+            x_bot, y_bot = int(bottom_lip.x * w), int(bottom_lip.y * h)
+
+
 
             # ----- Skin color detection (average RGB on left cheek patch) -----
             patch_size = 20
